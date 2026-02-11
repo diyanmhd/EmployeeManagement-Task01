@@ -1,10 +1,11 @@
-﻿using EmployeeManagement.Models;
+﻿using EmployeeManagement.DTOs;
+using EmployeeManagement.Models;
 
 namespace EmployeeManagement.Services
 {
     public interface IEmployeeService
     {
         Employee GetEmployeeById(int id);
-        void UpdateEmployee(int id, Employee employee, string modifiedBy);
+        void UpdateEmployee(int id, UpdateEmployeeRequest request, string modifiedBy);
     }
 }

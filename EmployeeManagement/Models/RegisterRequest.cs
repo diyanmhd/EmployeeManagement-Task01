@@ -3,6 +3,9 @@
     public class RegisterRequest
     {
         public string Name { get; set; }
+
+        public string Username { get; set; }   // ✅ ADD THIS
+
         public string Email { get; set; }
         public string Password { get; set; }
 

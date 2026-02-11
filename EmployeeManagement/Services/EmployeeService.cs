@@ -1,4 +1,5 @@
-﻿using EmployeeManagement.Models;
+﻿using EmployeeManagement.DTOs;
+using EmployeeManagement.Models;
 using EmployeeManagement.Repositories;
 
 namespace EmployeeManagement.Services
@@ -17,8 +18,16 @@ namespace EmployeeManagement.Services
             return _employeeRepository.GetById(id);
         }
 
-        public void UpdateEmployee(int id, Employee employee, string modifiedBy)
+        public void UpdateEmployee(int id, UpdateEmployeeRequest request, string modifiedBy)
         {
+            var employee = new Employee
+            {
+                Designation = request.Designation,
+                Department = request.Department,
+                Address = request.Address,
+                Skillset = request.Skillset
+            };
+
             _employeeRepository.Update(id, employee, modifiedBy);
         }
     }

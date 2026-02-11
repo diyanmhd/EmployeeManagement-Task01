@@ -14,6 +14,9 @@ namespace EmployeeManagement.Repositories
             _config = config;
         }
 
+        // =========================
+        // GET ALL EMPLOYEES
+        // =========================
         public List<Employee> GetAllEmployees()
         {
             var employees = new List<Employee>();
@@ -40,13 +43,17 @@ namespace EmployeeManagement.Repositories
                     Department = reader["Department"].ToString(),
                     Address = reader["Address"].ToString(),
                     JoiningDate = reader["JoiningDate"] as DateTime?,
-                    Skillset = reader["Skillset"].ToString()
+                    Skillset = reader["Skillset"].ToString(),
+                    Status = reader["Status"].ToString()   
                 });
             }
 
             return employees;
         }
 
+        // =========================
+        // UPDATE EMPLOYEE (DETAILS + STATUS)
+        // =========================
         public void UpdateEmployee(int id, Employee employee, string modifiedBy)
         {
             using SqlConnection con =
@@ -62,12 +69,19 @@ namespace EmployeeManagement.Repositories
             cmd.Parameters.AddWithValue("@Department", employee.Department);
             cmd.Parameters.AddWithValue("@Address", employee.Address);
             cmd.Parameters.AddWithValue("@Skillset", employee.Skillset);
+
+            // 🔴 NEW — ENABLE / DISABLE SUPPORT
+            cmd.Parameters.AddWithValue("@Status", employee.Status);
+
             cmd.Parameters.AddWithValue("@ModifiedBy", modifiedBy);
 
             con.Open();
             cmd.ExecuteNonQuery();
         }
 
+        // =========================
+        // DELETE EMPLOYEE (SOFT DELETE)
+        // =========================
         public void DeleteEmployee(int id, string modifiedBy)
         {
             using SqlConnection con =
@@ -86,3 +100,4 @@ namespace EmployeeManagement.Repositories
         }
     }
 }
+ 

@@ -38,10 +38,10 @@ namespace EmployeeManagement.Repositories
                 Designation = reader["Designation"].ToString(),
                 Department = reader["Department"].ToString(),
                 Address = reader["Address"].ToString(),
+                Skillset = reader["Skillset"].ToString(),
                 JoiningDate = reader["JoiningDate"] == DBNull.Value
-                ? DateTime.MinValue
-                : (DateTime)reader["JoiningDate"],
-                Skillset = reader["Skillset"].ToString()
+                    ? DateTime.MinValue
+                    : (DateTime)reader["JoiningDate"]
             };
         }
 

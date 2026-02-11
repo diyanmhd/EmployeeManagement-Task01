@@ -1,4 +1,4 @@
-﻿using EmployeeManagement.Models;
+﻿using EmployeeManagement.DTOs;
 using EmployeeManagement.Services;
 using Microsoft.AspNetCore.Mvc;
 
@@ -15,26 +15,46 @@ namespace EmployeeManagement.Controllers
             _adminService = adminService;
         }
 
-        // GET: api/admin/employees
+        // =========================
+        // GET ALL EMPLOYEES
+        // =========================
         [HttpGet("employees")]
         public IActionResult GetAllEmployees()
         {
-            var employees = _adminService.GetAllEmployees();
-            return Ok(employees);
+            return Ok(_adminService.GetAllEmployees());
         }
 
-        // PUT: api/admin/employee/5
+        // =========================
+        // UPDATE EMPLOYEE (ADMIN)
+        // =========================
         [HttpPut("employee/{id}")]
-        public IActionResult UpdateEmployee(int id, [FromBody] Employee employee)
+        public IActionResult UpdateEmployee(
+            int id,
+            [FromBody] UpdateEmployeeByAdminRequest request)
         {
-            _adminService.UpdateEmployee(id, employee, "admin");
-            return Ok("Employee updated successfully");
+            if (id <= 0)
+                return BadRequest("Invalid employee id");
+
+            try
+            {
+                _adminService.UpdateEmployee(id, request);
+                return Ok("Employee updated successfully");
+            }
+            catch (ArgumentException ex)
+            {
+                return BadRequest(ex.Message);
+            }
         }
 
-        // DELETE: api/admin/employee/5
+        // =========================
+        // DELETE EMPLOYEE (SOFT DELETE)
+        // =========================
         [HttpDelete("employee/{id}")]
         public IActionResult DeleteEmployee(int id)
         {
+            if (id <= 0)
+                return BadRequest("Invalid employee id");
+
             _adminService.DeleteEmployee(id, "admin");
             return Ok("Employee deleted (soft delete)");
         }
