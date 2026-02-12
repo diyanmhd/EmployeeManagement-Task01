@@ -17,10 +17,11 @@ namespace EmployeeManagement.Services
         // =========================
         // GET ALL EMPLOYEES
         // =========================
-        public List<Employee> GetAllEmployees()
+        public PagedResult<Employee> GetAllEmployees(int pageNumber, int pageSize)
         {
-            return _adminRepository.GetAllEmployees();
+            return _adminRepository.GetAllEmployees(pageNumber, pageSize);
         }
+
 
         // =========================
         // UPDATE EMPLOYEE (ADMIN)

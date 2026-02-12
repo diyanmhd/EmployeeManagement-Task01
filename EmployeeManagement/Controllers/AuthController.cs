@@ -19,11 +19,14 @@ namespace EmployeeManagement.Controllers
         }
 
         // =========================
-        // REGISTER
+        // REGISTER (UPDATED WITH PHOTO)
         // =========================
         [HttpPost("register")]
-        public IActionResult Register(RegisterRequest request)
+        public async Task<IActionResult> Register([FromForm] RegisterRequest request)
         {
+            if (request == null)
+                return BadRequest("Invalid request");
+
             string hashedPassword;
             using (SHA256 sha256 = SHA256.Create())
             {
@@ -31,6 +34,17 @@ namespace EmployeeManagement.Controllers
                     Encoding.UTF8.GetBytes(request.Password)
                 );
                 hashedPassword = Convert.ToBase64String(bytes);
+            }
+
+            byte[]? photoBytes = null;
+
+            if (request.Photo != null && request.Photo.Length > 0)
+            {
+                using (var ms = new MemoryStream())
+                {
+                    await request.Photo.CopyToAsync(ms);
+                    photoBytes = ms.ToArray();
+                }
             }
 
             using SqlConnection con =
@@ -51,10 +65,14 @@ namespace EmployeeManagement.Controllers
             cmd.Parameters.AddWithValue("@JoiningDate", request.JoiningDate);
             cmd.Parameters.AddWithValue("@Skillset", request.Skillset);
 
+            // ✅ Photo parameter
+            cmd.Parameters.Add("@Photo", SqlDbType.VarBinary)
+                          .Value = (object?)photoBytes ?? DBNull.Value;
+
             try
             {
                 con.Open();
-                cmd.ExecuteNonQuery();
+                await cmd.ExecuteNonQueryAsync();
             }
             catch (SqlException ex)
             {
@@ -65,7 +83,7 @@ namespace EmployeeManagement.Controllers
         }
 
         // =========================
-        // LOGIN (UPDATED)
+        // LOGIN
         // =========================
         [HttpPost("login")]
         public IActionResult Login(LoginRequest request)
@@ -90,7 +108,6 @@ namespace EmployeeManagement.Controllers
 
             con.Open();
 
-            // 1️⃣ Try login for ACTIVE user
             using SqlCommand loginCmd =
                 new("sp_Login", con);
 
@@ -115,7 +132,6 @@ namespace EmployeeManagement.Controllers
 
             reader.Close();
 
-            // 2️⃣ Check if user exists but is INACTIVE
             using SqlCommand statusCmd = new SqlCommand(
                 "SELECT Status FROM Employees WHERE Username = @Username",
                 con
@@ -132,7 +148,6 @@ namespace EmployeeManagement.Controllers
                 return Unauthorized("Your account is disabled. Please contact admin");
             }
 
-            // 3️⃣ Otherwise invalid credentials
             return Unauthorized("Invalid credentials");
         }
     }

@@ -24,7 +24,9 @@ namespace EmployeeManagement.Models
 
         public string Role { get; set; }
 
-        // 🔴 IMPORTANT — REQUIRED FOR ENABLE / DISABLE
         public string Status { get; set; }
+
+        // ✅ ADD THIS
+        public byte[]? Photo { get; set; }
     }
 }

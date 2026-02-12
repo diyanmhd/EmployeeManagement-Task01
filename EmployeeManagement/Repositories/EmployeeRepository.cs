@@ -13,6 +13,9 @@ namespace EmployeeManagement.Repositories
             _config = config;
         }
 
+        // =========================
+        // GET EMPLOYEE BY ID (PROFILE)
+        // =========================
         public Employee GetById(int id)
         {
             using SqlConnection con =
@@ -34,17 +37,29 @@ namespace EmployeeManagement.Repositories
             {
                 Id = (int)reader["Id"],
                 Name = reader["Name"].ToString(),
+                Username = reader["Username"].ToString(),
                 Email = reader["Email"].ToString(),
                 Designation = reader["Designation"].ToString(),
                 Department = reader["Department"].ToString(),
                 Address = reader["Address"].ToString(),
                 Skillset = reader["Skillset"].ToString(),
+                Role = reader["Role"].ToString(),
+                Status = reader["Status"].ToString(),
                 JoiningDate = reader["JoiningDate"] == DBNull.Value
-                    ? DateTime.MinValue
-                    : (DateTime)reader["JoiningDate"]
+                    ? null
+                    : (DateTime)reader["JoiningDate"],
+
+                // ✅ PHOTO MAPPING
+                Photo = reader["Photo"] == DBNull.Value
+                    ? null
+                    : (byte[])reader["Photo"]
             };
         }
 
+
+        // =========================
+        // UPDATE PROFILE
+        // =========================
         public void Update(int id, Employee employee, string modifiedBy)
         {
             using SqlConnection con =

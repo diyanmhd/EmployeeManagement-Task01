@@ -17,9 +17,10 @@ namespace EmployeeManagement.Repositories
         // =========================
         // GET ALL EMPLOYEES
         // =========================
-        public List<Employee> GetAllEmployees()
+        public PagedResult<Employee> GetAllEmployees(int pageNumber, int pageSize)
         {
             var employees = new List<Employee>();
+            int totalCount = 0;
 
             using SqlConnection con =
                 new(_config.GetConnectionString("DefaultConnection"));
@@ -29,11 +30,21 @@ namespace EmployeeManagement.Repositories
 
             cmd.CommandType = CommandType.StoredProcedure;
 
+            // ✅ Pass pagination parameters
+            cmd.Parameters.AddWithValue("@PageNumber", pageNumber);
+            cmd.Parameters.AddWithValue("@PageSize", pageSize);
+
             con.Open();
+
             using SqlDataReader reader = cmd.ExecuteReader();
 
             while (reader.Read())
             {
+                if (totalCount == 0)
+                {
+                    totalCount = (int)reader["TotalCount"];
+                }
+
                 employees.Add(new Employee
                 {
                     Id = (int)reader["Id"],
@@ -44,12 +55,19 @@ namespace EmployeeManagement.Repositories
                     Address = reader["Address"].ToString(),
                     JoiningDate = reader["JoiningDate"] as DateTime?,
                     Skillset = reader["Skillset"].ToString(),
-                    Status = reader["Status"].ToString()   
+                    Status = reader["Status"].ToString()
                 });
             }
 
-            return employees;
+            return new PagedResult<Employee>
+            {
+                Items = employees,
+                TotalCount = totalCount,
+                PageNumber = pageNumber,
+                PageSize = pageSize
+            };
         }
+
 
         // =========================
         // UPDATE EMPLOYEE (DETAILS + STATUS)

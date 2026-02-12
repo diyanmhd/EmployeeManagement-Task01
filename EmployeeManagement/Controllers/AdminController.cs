@@ -1,4 +1,5 @@
 ﻿using EmployeeManagement.DTOs;
+using EmployeeManagement.Models;
 using EmployeeManagement.Services;
 using Microsoft.AspNetCore.Mvc;
 
@@ -16,12 +17,20 @@ namespace EmployeeManagement.Controllers
         }
 
         // =========================
-        // GET ALL EMPLOYEES
+        // GET ALL EMPLOYEES (PAGINATION)
         // =========================
         [HttpGet("employees")]
-        public IActionResult GetAllEmployees()
+        public IActionResult GetAllEmployees(
+            int pageNumber = 1,
+            int pageSize = 10)
         {
-            return Ok(_adminService.GetAllEmployees());
+            if (pageNumber <= 0 || pageSize <= 0)
+                return BadRequest("Invalid pagination values");
+
+            var result = _adminService
+                .GetAllEmployees(pageNumber, pageSize);
+
+            return Ok(result);
         }
 
         // =========================
