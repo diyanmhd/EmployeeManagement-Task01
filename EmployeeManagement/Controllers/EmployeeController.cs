@@ -15,6 +15,9 @@ namespace EmployeeManagement.Controllers
             _employeeService = employeeService;
         }
 
+        // =========================
+        // GET MY PROFILE
+        // =========================
         [HttpGet("profile")]
         public IActionResult GetMyProfile([FromQuery] int userId)
         {
@@ -29,11 +32,39 @@ namespace EmployeeManagement.Controllers
             return Ok(employee);
         }
 
+        // =========================
+        // UPDATE PROFILE DETAILS
+        // =========================
         [HttpPut("{id}")]
         public IActionResult Update(int id, [FromBody] UpdateEmployeeRequest request)
         {
             _employeeService.UpdateEmployee(id, request, "employee");
             return Ok("Profile updated successfully");
+        }
+
+        // =========================
+        // UPDATE PHOTO
+        // =========================
+        [HttpPut("{id}/photo")]
+        public async Task<IActionResult> UpdatePhoto(int id, IFormFile? photo)
+        {
+            if (id <= 0)
+                return BadRequest("Invalid employee ID");
+
+            byte[]? photoBytes = null;
+
+            if (photo != null)
+            {
+                using (var ms = new MemoryStream())
+                {
+                    await photo.CopyToAsync(ms);
+                    photoBytes = ms.ToArray();
+                }
+            }
+
+            _employeeService.UpdateEmployeePhoto(id, photoBytes, "employee");
+
+            return Ok("Photo updated successfully");
         }
     }
 }

@@ -49,13 +49,11 @@ namespace EmployeeManagement.Repositories
                     ? null
                     : (DateTime)reader["JoiningDate"],
 
-                // ✅ PHOTO MAPPING
                 Photo = reader["Photo"] == DBNull.Value
                     ? null
                     : (byte[])reader["Photo"]
             };
         }
-
 
         // =========================
         // UPDATE PROFILE
@@ -75,6 +73,32 @@ namespace EmployeeManagement.Repositories
             cmd.Parameters.AddWithValue("@Department", employee.Department);
             cmd.Parameters.AddWithValue("@Address", employee.Address);
             cmd.Parameters.AddWithValue("@Skillset", employee.Skillset);
+            cmd.Parameters.AddWithValue("@ModifiedBy", modifiedBy);
+
+            con.Open();
+            cmd.ExecuteNonQuery();
+        }
+
+        // =========================
+        // UPDATE PHOTO
+        // =========================
+        public void UpdatePhoto(int id, byte[]? photo, string modifiedBy)
+        {
+            using SqlConnection con =
+                new(_config.GetConnectionString("DefaultConnection"));
+
+            using SqlCommand cmd =
+                new("sp_UpdateEmployeePhoto", con);
+
+            cmd.CommandType = CommandType.StoredProcedure;
+
+            cmd.Parameters.AddWithValue("@Id", id);
+
+            if (photo != null)
+                cmd.Parameters.AddWithValue("@Photo", photo);
+            else
+                cmd.Parameters.Add("@Photo", SqlDbType.VarBinary, -1).Value = DBNull.Value;
+
             cmd.Parameters.AddWithValue("@ModifiedBy", modifiedBy);
 
             con.Open();

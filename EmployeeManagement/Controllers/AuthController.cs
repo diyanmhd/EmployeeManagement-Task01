@@ -139,7 +139,7 @@ namespace EmployeeManagement.Controllers
 
             statusCmd.Parameters.Add("@Username", SqlDbType.NVarChar, 100)
                                 .Value = request.Username.Trim();
-
+                                                  
             object statusResult = statusCmd.ExecuteScalar();
 
             if (statusResult != null &&

@@ -1,7 +1,6 @@
 ﻿using EmployeeManagement.DTOs;
 using EmployeeManagement.Models;
 using EmployeeManagement.Repositories;
-using System.Collections.Generic;
 
 namespace EmployeeManagement.Services
 {
@@ -15,13 +14,29 @@ namespace EmployeeManagement.Services
         }
 
         // =========================
-        // GET ALL EMPLOYEES
+        // GET ALL EMPLOYEES (WITH SEARCH, FILTER, SORT)
         // =========================
-        public PagedResult<Employee> GetAllEmployees(int pageNumber, int pageSize)
+        public PagedResult<Employee> GetAllEmployees(
+            int pageNumber,
+            int pageSize,
+            string? search,
+            string? status,
+            string? department,
+            string? designation,
+            string? sortBy,
+            string? sortOrder)
         {
-            return _adminRepository.GetAllEmployees(pageNumber, pageSize);
+            return _adminRepository.GetAllEmployees(
+                pageNumber,
+                pageSize,
+                search,
+                status,
+                department,
+                designation,
+                sortBy,
+                sortOrder
+            );
         }
-
 
         // =========================
         // UPDATE EMPLOYEE (ADMIN)

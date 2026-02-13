@@ -13,11 +13,17 @@ namespace EmployeeManagement.Services
             _employeeRepository = employeeRepository;
         }
 
+        // =========================
+        // GET PROFILE
+        // =========================
         public Employee GetEmployeeById(int id)
         {
             return _employeeRepository.GetById(id);
         }
 
+        // =========================
+        // UPDATE PROFILE DETAILS
+        // =========================
         public void UpdateEmployee(int id, UpdateEmployeeRequest request, string modifiedBy)
         {
             var employee = new Employee
@@ -29,6 +35,14 @@ namespace EmployeeManagement.Services
             };
 
             _employeeRepository.Update(id, employee, modifiedBy);
+        }
+
+        // =========================
+        // UPDATE PHOTO
+        // =========================
+        public void UpdateEmployeePhoto(int id, byte[]? photo, string modifiedBy)
+        {
+            _employeeRepository.UpdatePhoto(id, photo, modifiedBy);
         }
     }
 }

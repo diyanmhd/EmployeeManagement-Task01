@@ -17,18 +17,40 @@ namespace EmployeeManagement.Controllers
         }
 
         // =========================
-        // GET ALL EMPLOYEES (PAGINATION)
+        // GET ALL EMPLOYEES (SEARCH, FILTER, SORT, PAGINATION)
         // =========================
         [HttpGet("employees")]
         public IActionResult GetAllEmployees(
             int pageNumber = 1,
-            int pageSize = 10)
+            int pageSize = 10,
+            string? search = null,
+            string? status = null,
+            string? department = null,
+            string? designation = null,
+            string? sortBy = null,
+            string? sortOrder = null)
         {
             if (pageNumber <= 0 || pageSize <= 0)
                 return BadRequest("Invalid pagination values");
 
-            var result = _adminService
-                .GetAllEmployees(pageNumber, pageSize);
+            // Normalize sort order
+            if (!string.IsNullOrWhiteSpace(sortOrder))
+            {
+                sortOrder = sortOrder.ToUpper();
+                if (sortOrder != "ASC" && sortOrder != "DESC")
+                    return BadRequest("Invalid sortOrder. Allowed values: ASC or DESC");
+            }
+
+            var result = _adminService.GetAllEmployees(
+                pageNumber,
+                pageSize,
+                search,
+                status,
+                department,
+                designation,
+                sortBy,
+                sortOrder
+            );
 
             return Ok(result);
         }
