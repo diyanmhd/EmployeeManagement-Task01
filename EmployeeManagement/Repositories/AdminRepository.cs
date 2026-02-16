@@ -1,17 +1,16 @@
 ﻿using EmployeeManagement.Models;
-using Microsoft.Data.SqlClient;
-using System.Data;
-using System.Collections.Generic;
+using EmployeeManagement.Data;
+using Microsoft.EntityFrameworkCore;
 
 namespace EmployeeManagement.Repositories
 {
     public class AdminRepository : IAdminRepository
     {
-        private readonly IConfiguration _config;
+        private readonly AppDbContext _context;
 
-        public AdminRepository(IConfiguration config)
+        public AdminRepository(AppDbContext context)
         {
-            _config = config;
+            _context = context;
         }
 
         // =========================
@@ -27,66 +26,62 @@ namespace EmployeeManagement.Repositories
             string? sortBy,
             string? sortOrder)
         {
-            var employees = new List<Employee>();
-            int totalCount = 0;
+            var query = _context.Employees.AsQueryable();
 
-            using SqlConnection con =
-                new(_config.GetConnectionString("DefaultConnection"));
-
-            using SqlCommand cmd =
-                new("sp_Admin_GetAllEmployees", con);
-
-            cmd.CommandType = CommandType.StoredProcedure;
-
-            // Pagination
-            cmd.Parameters.AddWithValue("@PageNumber", pageNumber);
-            cmd.Parameters.AddWithValue("@PageSize", pageSize);
-
-            // Search
-            cmd.Parameters.AddWithValue("@Search",
-                string.IsNullOrWhiteSpace(search) ? DBNull.Value : search);
-
-            // Filters
-            cmd.Parameters.AddWithValue("@Status",
-                string.IsNullOrWhiteSpace(status) ? DBNull.Value : status);
-
-            cmd.Parameters.AddWithValue("@Department",
-                string.IsNullOrWhiteSpace(department) ? DBNull.Value : department);
-
-            cmd.Parameters.AddWithValue("@Designation",
-                string.IsNullOrWhiteSpace(designation) ? DBNull.Value : designation);
-
-            // Sorting
-            cmd.Parameters.AddWithValue("@SortBy",
-                string.IsNullOrWhiteSpace(sortBy) ? DBNull.Value : sortBy);
-
-            cmd.Parameters.AddWithValue("@SortOrder",
-                string.IsNullOrWhiteSpace(sortOrder) ? DBNull.Value : sortOrder);
-
-            con.Open();
-
-            using SqlDataReader reader = cmd.ExecuteReader();
-
-            while (reader.Read())
+            // 🔍 SEARCH
+            if (!string.IsNullOrWhiteSpace(search))
             {
-                if (totalCount == 0)
-                {
-                    totalCount = (int)reader["TotalCount"];
-                }
-
-                employees.Add(new Employee
-                {
-                    Id = (int)reader["Id"],
-                    Name = reader["Name"]?.ToString(),
-                    Email = reader["Email"]?.ToString(),
-                    Designation = reader["Designation"]?.ToString(),
-                    Department = reader["Department"]?.ToString(),
-                    Address = reader["Address"]?.ToString(),
-                    JoiningDate = reader["JoiningDate"] as DateTime?,
-                    Skillset = reader["Skillset"]?.ToString(),
-                    Status = reader["Status"]?.ToString()
-                });
+                query = query.Where(e =>
+                    e.Name.Contains(search) ||
+                    e.Email.Contains(search));
             }
+
+            // 🎯 FILTERS
+            if (!string.IsNullOrWhiteSpace(status))
+                query = query.Where(e => e.Status == status);
+
+            if (!string.IsNullOrWhiteSpace(department))
+                query = query.Where(e => e.Department == department);
+
+            if (!string.IsNullOrWhiteSpace(designation))
+                query = query.Where(e => e.Designation == designation);
+
+            // 🔄 SORTING
+            if (!string.IsNullOrWhiteSpace(sortBy))
+            {
+                bool ascending = string.IsNullOrWhiteSpace(sortOrder) ||
+                                 sortOrder.ToLower() == "asc";
+
+                query = sortBy.ToLower() switch
+                {
+                    "name" => ascending ? query.OrderBy(e => e.Name)
+                                        : query.OrderByDescending(e => e.Name),
+
+                    "email" => ascending ? query.OrderBy(e => e.Email)
+                                         : query.OrderByDescending(e => e.Email),
+
+                    "department" => ascending ? query.OrderBy(e => e.Department)
+                                              : query.OrderByDescending(e => e.Department),
+
+                    "designation" => ascending ? query.OrderBy(e => e.Designation)
+                                               : query.OrderByDescending(e => e.Designation),
+
+                    _ => query.OrderBy(e => e.Id)
+                };
+            }
+            else
+            {
+                query = query.OrderBy(e => e.Id);
+            }
+
+            // 📄 TOTAL COUNT
+            int totalCount = query.Count();
+
+            // 📄 PAGINATION
+            var employees = query
+                .Skip((pageNumber - 1) * pageSize)
+                .Take(pageSize)
+                .ToList();
 
             return new PagedResult<Employee>
             {
@@ -102,24 +97,23 @@ namespace EmployeeManagement.Repositories
         // =========================
         public void UpdateEmployee(int id, Employee employee, string modifiedBy)
         {
-            using SqlConnection con =
-                new(_config.GetConnectionString("DefaultConnection"));
+            var existingEmployee = _context.Employees
+                .FirstOrDefault(e => e.Id == id);
 
-            using SqlCommand cmd =
-                new("sp_Admin_UpdateEmployee", con);
+            if (existingEmployee == null)
+                return;
 
-            cmd.CommandType = CommandType.StoredProcedure;
+            existingEmployee.Designation = employee.Designation;
+            existingEmployee.Department = employee.Department;
+            existingEmployee.Address = employee.Address;
+            existingEmployee.Skillset = employee.Skillset;
+            existingEmployee.Status = employee.Status;
 
-            cmd.Parameters.AddWithValue("@Id", id);
-            cmd.Parameters.AddWithValue("@Designation", employee.Designation);
-            cmd.Parameters.AddWithValue("@Department", employee.Department);
-            cmd.Parameters.AddWithValue("@Address", employee.Address);
-            cmd.Parameters.AddWithValue("@Skillset", employee.Skillset);
-            cmd.Parameters.AddWithValue("@Status", employee.Status);
-            cmd.Parameters.AddWithValue("@ModifiedBy", modifiedBy);
+            // 🔥 AUDIT UPDATE
+            existingEmployee.ModifiedBy = modifiedBy;
+            existingEmployee.ModifiedAt = DateTime.Now;
 
-            con.Open();
-            cmd.ExecuteNonQuery();
+            _context.SaveChanges();
         }
 
         // =========================
@@ -127,19 +121,18 @@ namespace EmployeeManagement.Repositories
         // =========================
         public void DeleteEmployee(int id, string modifiedBy)
         {
-            using SqlConnection con =
-                new(_config.GetConnectionString("DefaultConnection"));
+            var employee = _context.Employees
+                .FirstOrDefault(e => e.Id == id);
 
-            using SqlCommand cmd =
-                new("sp_Admin_DeleteEmployee", con);
+            if (employee == null)
+                return;
 
-            cmd.CommandType = CommandType.StoredProcedure;
+            // 🔥 AUDIT BEFORE DELETE (Optional)
+            employee.ModifiedBy = modifiedBy;
+            employee.ModifiedAt = DateTime.Now;
 
-            cmd.Parameters.AddWithValue("@Id", id);
-            cmd.Parameters.AddWithValue("@ModifiedBy", modifiedBy);
-
-            con.Open();
-            cmd.ExecuteNonQuery();
+            _context.Employees.Remove(employee);
+            _context.SaveChanges();
         }
     }
 }

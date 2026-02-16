@@ -1,7 +1,10 @@
 ﻿using EmployeeManagement.Models;
+using EmployeeManagement.Data;
 using Microsoft.AspNetCore.Mvc;
-using Microsoft.Data.SqlClient;
-using System.Data;
+using Microsoft.EntityFrameworkCore;
+using Microsoft.IdentityModel.Tokens;
+using System.IdentityModel.Tokens.Jwt;
+using System.Security.Claims;
 using System.Security.Cryptography;
 using System.Text;
 
@@ -11,15 +14,17 @@ namespace EmployeeManagement.Controllers
     [Route("api/auth")]
     public class AuthController : ControllerBase
     {
-        private readonly IConfiguration _config;
+        private readonly AppDbContext _context;
+        private readonly IConfiguration _configuration;
 
-        public AuthController(IConfiguration config)
+        public AuthController(AppDbContext context, IConfiguration configuration)
         {
-            _config = config;
+            _context = context;
+            _configuration = configuration;
         }
 
         // =========================
-        // REGISTER (UPDATED WITH PHOTO)
+        // REGISTER
         // =========================
         [HttpPost("register")]
         public async Task<IActionResult> Register([FromForm] RegisterRequest request)
@@ -27,6 +32,7 @@ namespace EmployeeManagement.Controllers
             if (request == null)
                 return BadRequest("Invalid request");
 
+            // 🔐 Hash Password
             string hashedPassword;
             using (SHA256 sha256 = SHA256.Create())
             {
@@ -36,57 +42,48 @@ namespace EmployeeManagement.Controllers
                 hashedPassword = Convert.ToBase64String(bytes);
             }
 
+            // 🔍 Check if username already exists
+            if (await _context.Employees.AnyAsync(e => e.Username == request.Username))
+                return BadRequest("Username already exists");
+
             byte[]? photoBytes = null;
 
             if (request.Photo != null && request.Photo.Length > 0)
             {
-                using (var ms = new MemoryStream())
-                {
-                    await request.Photo.CopyToAsync(ms);
-                    photoBytes = ms.ToArray();
-                }
+                using var ms = new MemoryStream();
+                await request.Photo.CopyToAsync(ms);
+                photoBytes = ms.ToArray();
             }
 
-            using SqlConnection con =
-                new(_config.GetConnectionString("DefaultConnection"));
-
-            using SqlCommand cmd =
-                new("sp_RegisterEmployee", con);
-
-            cmd.CommandType = CommandType.StoredProcedure;
-
-            cmd.Parameters.AddWithValue("@Name", request.Name);
-            cmd.Parameters.AddWithValue("@Username", request.Username);
-            cmd.Parameters.AddWithValue("@Email", request.Email);
-            cmd.Parameters.AddWithValue("@Password", hashedPassword);
-            cmd.Parameters.AddWithValue("@Designation", request.Designation);
-            cmd.Parameters.AddWithValue("@Department", request.Department);
-            cmd.Parameters.AddWithValue("@Address", request.Address);
-            cmd.Parameters.AddWithValue("@JoiningDate", request.JoiningDate);
-            cmd.Parameters.AddWithValue("@Skillset", request.Skillset);
-
-            // ✅ Photo parameter
-            cmd.Parameters.Add("@Photo", SqlDbType.VarBinary)
-                          .Value = (object?)photoBytes ?? DBNull.Value;
-
-            try
+            var employee = new Employee
             {
-                con.Open();
-                await cmd.ExecuteNonQueryAsync();
-            }
-            catch (SqlException ex)
-            {
-                return BadRequest(ex.Message);
-            }
+                Name = request.Name,
+                Username = request.Username,
+                Email = request.Email,
+                Password = hashedPassword,
+                Designation = request.Designation,
+                Department = request.Department,
+                Address = request.Address,
+                JoiningDate = request.JoiningDate,
+                Skillset = request.Skillset,
+                Role = "employee",
+                Status = "Active",
+                Photo = photoBytes,
+                CreatedBy = "self",
+                CreatedAt = DateTime.Now
+            };
+
+            _context.Employees.Add(employee);
+            await _context.SaveChangesAsync();
 
             return Ok("Registered successfully");
         }
 
         // =========================
-        // LOGIN
+        // LOGIN (WITH JWT)
         // =========================
         [HttpPost("login")]
-        public IActionResult Login(LoginRequest request)
+        public async Task<IActionResult> Login(LoginRequest request)
         {
             if (string.IsNullOrWhiteSpace(request.Username) ||
                 string.IsNullOrWhiteSpace(request.Password))
@@ -94,6 +91,7 @@ namespace EmployeeManagement.Controllers
                 return BadRequest("Username and Password are required");
             }
 
+            // 🔐 Hash input password
             string hashedPassword;
             using (SHA256 sha256 = SHA256.Create())
             {
@@ -103,52 +101,55 @@ namespace EmployeeManagement.Controllers
                 hashedPassword = Convert.ToBase64String(bytes);
             }
 
-            using SqlConnection con =
-                new(_config.GetConnectionString("DefaultConnection"));
+            var user = await _context.Employees
+                .FirstOrDefaultAsync(e => e.Username == request.Username);
 
-            con.Open();
+            if (user == null)
+                return Unauthorized("Invalid credentials");
 
-            using SqlCommand loginCmd =
-                new("sp_Login", con);
+            if (user.Status == "Inactive")
+                return Unauthorized("Your account is disabled. Please contact admin");
 
-            loginCmd.CommandType = CommandType.StoredProcedure;
+            if (user.Password != hashedPassword)
+                return Unauthorized("Invalid credentials");
 
-            loginCmd.Parameters.Add("@Username", SqlDbType.NVarChar, 100)
-                               .Value = request.Username.Trim();
-            loginCmd.Parameters.Add("@Password", SqlDbType.NVarChar, 200)
-                               .Value = hashedPassword;
-
-            using SqlDataReader reader = loginCmd.ExecuteReader();
-
-            if (reader.Read())
-            {
-                return Ok(new
-                {
-                    UserId = reader["Id"],
-                    Name = reader["Name"],
-                    Role = reader["Role"]
-                });
-            }
-
-            reader.Close();
-
-            using SqlCommand statusCmd = new SqlCommand(
-                "SELECT Status FROM Employees WHERE Username = @Username",
-                con
+            // 🔐 JWT SETTINGS
+            var jwtSettings = _configuration.GetSection("Jwt");
+            var key = new SymmetricSecurityKey(
+                Encoding.UTF8.GetBytes(jwtSettings["Key"]!)
             );
 
-            statusCmd.Parameters.Add("@Username", SqlDbType.NVarChar, 100)
-                                .Value = request.Username.Trim();
-                                                  
-            object statusResult = statusCmd.ExecuteScalar();
+            var credentials = new SigningCredentials(
+                key,
+                SecurityAlgorithms.HmacSha256
+            );
 
-            if (statusResult != null &&
-                statusResult.ToString() == "Inactive")
+            var claims = new[]
             {
-                return Unauthorized("Your account is disabled. Please contact admin");
-            }
+                new Claim(ClaimTypes.NameIdentifier, user.Id.ToString()),
+                new Claim(ClaimTypes.Name, user.Username),
+                new Claim(ClaimTypes.Role, user.Role)
+            };
 
-            return Unauthorized("Invalid credentials");
+            var token = new JwtSecurityToken(
+                issuer: jwtSettings["Issuer"],
+                audience: jwtSettings["Audience"],
+                claims: claims,
+                expires: DateTime.Now.AddMinutes(
+                    Convert.ToDouble(jwtSettings["DurationInMinutes"])
+                ),
+                signingCredentials: credentials
+            );
+
+            var tokenString = new JwtSecurityTokenHandler().WriteToken(token);
+
+            return Ok(new
+            {
+                Token = tokenString,
+                UserId = user.Id,
+                Name = user.Name,
+                Role = user.Role
+            });
         }
     }
 }

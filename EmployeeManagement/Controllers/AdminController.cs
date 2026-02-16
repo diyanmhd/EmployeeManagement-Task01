@@ -1,10 +1,12 @@
 ﻿using EmployeeManagement.DTOs;
 using EmployeeManagement.Models;
 using EmployeeManagement.Services;
+using Microsoft.AspNetCore.Authorization;   // ✅ Added
 using Microsoft.AspNetCore.Mvc;
 
 namespace EmployeeManagement.Controllers
 {
+    [Authorize(Roles = "admin")]   // ✅ Admin Only
     [ApiController]
     [Route("api/admin")]
     public class AdminController : ControllerBase
@@ -33,7 +35,6 @@ namespace EmployeeManagement.Controllers
             if (pageNumber <= 0 || pageSize <= 0)
                 return BadRequest("Invalid pagination values");
 
-            // Normalize sort order
             if (!string.IsNullOrWhiteSpace(sortOrder))
             {
                 sortOrder = sortOrder.ToUpper();
